@@ -1,0 +1,15 @@
+# 依赖
+node_modules/
+package-lock.json
+
+# 临时文件
+*.tmp
+*.log
+.DS_Store
+Thumbs.db
+
+# 工作目录
+.trae/
+
+# 打包文件
+*.zip

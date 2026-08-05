@@ -1,0 +1,594 @@
+/**
+ * style.css — 大屏互动导览应用样式
+ * ====================================================
+ * 设计目标：数字馆大屏 (1920×1080+)，
+ * 科技城市背景 + 角色站在背景前，
+ * 字幕底部居中，童声配音。
+ */
+
+/* ==================== 全局重置 ==================== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --accent: #5BB8FF;
+  --bg-dark: #0a1628;
+  --bg-mid: #15294a;
+  --text: #ffffff;
+  --text-muted: rgba(255, 255, 255, 0.6);
+  --subtitle-bg: rgba(0, 0, 0, 0.0);
+  --card-bg: rgba(255, 255, 255, 0.1);
+  --card-border: rgba(255, 255, 255, 0.2);
+  --radius: 16px;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-dark);
+  color: var(--text);
+  font-family: "Noto Sans CJK SC", "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ==================== 主容器 ==================== */
+#app {
+  position: relative;
+  width: calc(100vw - 4vw);
+  height: calc(100vh - 4vh);
+  margin: 2vh 2vw;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  z-index: 1;
+  /* 默认背景图（悦白待机图），JS 会动态切换 */
+  background-image: url('assets/yuebai_idle.png');
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+}
+
+/* 进场动画：背景缩放淡入 */
+#app.entering {
+  animation: appEntrance 1.5s ease forwards;
+}
+
+@keyframes appEntrance {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* 张嘴图片全屏覆盖层（用于嘴部动画，与背景图叠加） */
+#speak-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transition: opacity 0.08s ease;
+  pointer-events: none;
+}
+
+/* 背景擦除过渡层 */
+#bg-wipe {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  /* 默认完全隐藏（从底部裁剪掉100%） */
+  clip-path: inset(0 0 100% 0);
+  pointer-events: none;
+}
+
+/* 擦除层的渐变叠加（与 #app::before 保持一致） */
+#bg-wipe::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(10, 22, 40, 0.25) 0%,
+    rgba(10, 22, 40, 0.0) 30%,
+    rgba(10, 22, 40, 0.0) 60%,
+    rgba(10, 22, 40, 0.15) 80%,
+    rgba(10, 22, 40, 0.35) 100%
+  );
+  pointer-events: none;
+}
+
+/* 擦除动画：从上到下逐渐展开新背景 */
+#bg-wipe.wiping {
+  animation: bgWipeDown 0.8s ease-in-out forwards;
+}
+
+@keyframes bgWipeDown {
+  0% {
+    clip-path: inset(0 0 100% 0);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* 背景渐变叠加层（轻微暗化顶部和底部，增强角色和字幕对比度） */
+#app::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(10, 22, 40, 0.25) 0%,
+    rgba(10, 22, 40, 0.0) 30%,
+    rgba(10, 22, 40, 0.0) 60%,
+    rgba(10, 22, 40, 0.15) 80%,
+    rgba(10, 22, 40, 0.35) 100%
+  );
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ==================== 角色展示区 ==================== */
+#character-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  position: relative;
+  padding: 80px 20px 10px;
+  z-index: 3;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+#character-area.switching {
+  opacity: 0;
+  transform: scale(0.92);
+}
+
+#character-info {
+  text-align: center;
+}
+
+#character-name {
+  font-size: clamp(1.8rem, 3.5vw, 3rem);
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.8), 0 0 30px var(--accent);
+  margin-bottom: 0.2em;
+  transition: color 0.4s ease;
+  color: var(--accent);
+}
+
+#character-theme {
+  font-size: clamp(0.85rem, 1.5vw, 1.3rem);
+  color: var(--text-muted);
+  letter-spacing: 0.1em;
+  margin-bottom: 0.8em;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.8);
+}
+
+/* ==================== 进场动画 ==================== */
+
+#character-area.entering #character-name {
+  animation: nameEnter 0.6s ease 0.5s forwards;
+  opacity: 0;
+}
+
+#character-area.entering #character-theme {
+  animation: nameEnter 0.6s ease 0.7s forwards;
+  opacity: 0;
+}
+
+/* 名字/主题从上方淡入 */
+@keyframes nameEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 进场光圈效果 */
+#character-area .entrance-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--accent);
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+#character-area.entering .entrance-ring {
+  animation: ringExpand 1s ease-out forwards;
+}
+
+#character-area.entering .entrance-ring:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+@keyframes ringExpand {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0.8;
+    border-width: 4px;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(25);
+    opacity: 0;
+    border-width: 1px;
+  }
+}
+
+/* ==================== 字幕栏 ==================== */
+#interim-text {
+  text-align: center;
+  font-size: clamp(0.8rem, 1.2vw, 1.1rem);
+  color: var(--accent);
+  opacity: 0.8;
+  min-height: 1.5em;
+  padding: 0 40px 8px;
+  font-style: italic;
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.8);
+  z-index: 3;
+  position: relative;
+}
+
+#subtitle-bar {
+  min-height: 130px;
+  padding: 24px 80px;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-top: none;
+  z-index: 3;
+  position: relative;
+}
+
+#subtitle-bar.active {
+  background: transparent;
+  border-top-color: var(--accent);
+  box-shadow: 0 -5px 30px rgba(91, 184, 255, 0.15);
+}
+
+#subtitle-text {
+  font-size: clamp(1.2rem, 2.4vw, 2.2rem);
+  text-align: center;
+  max-width: 85%;
+  line-height: 1.6;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 1), 0 0 12px rgba(0, 0, 0, 0.9), 0 0 24px rgba(0, 0, 0, 0.7);
+}
+
+#subtitle-text.fade-in {
+  animation: subtitleFade 0.4s ease;
+}
+
+@keyframes subtitleFade {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ==================== 语音状态指示器 ==================== */
+#voice-status {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 10;
+}
+
+#status-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+  transition: background 0.3s ease;
+}
+
+#status-icon.listening {
+  background: #4ade80;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+#status-icon.speaking {
+  background: var(--accent);
+  animation: pulse 0.8s ease-in-out infinite;
+}
+
+#status-icon.standby {
+  background: #ffa940;
+  animation: pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.5); opacity: 0.5; }
+}
+
+#status-text {
+  font-size: clamp(0.8rem, 1vw, 1rem);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* ==================== 角色选择栏 ==================== */
+#character-selector {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  display: flex;
+  gap: 12px;
+  z-index: 10;
+}
+
+.char-btn {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 2px solid var(--card-border);
+  background: var(--card-bg);
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.char-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  padding: 4px;
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+
+.char-btn:hover {
+  border-color: var(--accent);
+  transform: translateY(-4px);
+}
+
+.char-btn:hover img {
+  opacity: 0.9;
+}
+
+.char-btn.active {
+  border-color: var(--accent);
+  border-width: 3px;
+  box-shadow: 0 0 20px rgba(91, 184, 255, 0.5);
+  transform: scale(1.08);
+}
+
+.char-btn.active img {
+  opacity: 1;
+}
+
+.char-btn-label {
+  position: absolute;
+  bottom: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.char-btn:hover .char-btn-label,
+.char-btn.active .char-btn-label {
+  opacity: 1;
+}
+
+/* ==================== 开场视频（播放完毕定格为启动屏） ==================== */
+#intro-video-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#intro-video-wrap.hidden {
+  display: none;
+}
+
+#intro-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+#intro-skip {
+  position: absolute;
+  bottom: 30px;
+  right: 30px;
+  padding: 8px 24px;
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: all 0.3s ease;
+  font-family: inherit;
+}
+
+#intro-skip:hover {
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+}
+
+#intro-skip.hidden {
+  display: none;
+}
+
+/* 开始按钮（叠加在视频定格画面上） */
+#start-btn {
+  position: absolute;
+  bottom: 15%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 18px 60px;
+  font-size: clamp(1.2rem, 2vw, 1.8rem);
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), #3a7bd5);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 8px 30px rgba(91, 184, 255, 0.5), 0 0 60px rgba(91, 184, 255, 0.2);
+  font-family: inherit;
+  animation: btnBreathe 2s ease-in-out infinite;
+  z-index: 10;
+}
+
+#start-btn.hidden {
+  display: none;
+}
+
+#start-btn:hover {
+  transform: translateX(-50%) translateY(-3px) scale(1.05);
+  box-shadow: 0 12px 40px rgba(91, 184, 255, 0.7), 0 0 80px rgba(91, 184, 255, 0.3);
+}
+
+#start-btn:active {
+  transform: translateX(-50%) translateY(0) scale(0.98);
+}
+
+@keyframes btnBreathe {
+  0%, 100% { box-shadow: 0 8px 30px rgba(91, 184, 255, 0.5), 0 0 60px rgba(91, 184, 255, 0.2); }
+  50%      { box-shadow: 0 8px 30px rgba(91, 184, 255, 0.6), 0 0 100px rgba(91, 184, 255, 0.35); }
+}
+
+/* ==================== 打断按钮 ==================== */
+#interrupt-btn {
+  position: absolute;
+  bottom: 160px;
+  right: 32px;
+  padding: 8px 20px;
+  font-size: clamp(0.75rem, 1vw, 0.9rem);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: #fff;
+  background: linear-gradient(135deg, #ff4757, #e84118);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  z-index: 20;
+  box-shadow: 0 4px 16px rgba(255, 71, 87, 0.4);
+  transition: all 0.3s ease;
+  font-family: inherit;
+  animation: btnPulse 2s ease-in-out infinite;
+}
+
+#interrupt-btn:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 6px 20px rgba(255, 71, 87, 0.6);
+}
+
+#interrupt-btn:active {
+  transform: translateY(0) scale(0.96);
+}
+
+#interrupt-btn.hidden {
+  display: none;
+}
+
+@keyframes btnPulse {
+  0%, 100% { box-shadow: 0 4px 16px rgba(255, 71, 87, 0.4); }
+  50%      { box-shadow: 0 4px 24px rgba(255, 71, 87, 0.65); }
+}
+
+/* ==================== 浏览器兼容警告 ==================== */
+#warning {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 32px 48px;
+  background: rgba(20, 30, 50, 0.95);
+  border: 2px solid rgba(255, 180, 50, 0.6);
+  border-radius: 16px;
+  color: #ffd896;
+  font-size: 1.1rem;
+  line-height: 1.8;
+  max-width: 560px;
+  text-align: center;
+  white-space: pre-line;
+  z-index: 200;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+}
+
+#warning.hidden {
+  display: none;
+}
+
+/* ==================== 响应式调整 ==================== */
+@media (max-width: 768px) {
+  #subtitle-bar {
+    min-height: 100px;
+    padding: 16px 24px;
+  }
+
+  #character-selector {
+    gap: 8px;
+  }
+
+  .char-btn {
+    width: 56px;
+    height: 56px;
+  }
+
+  #voice-status {
+    top: 16px;
+    right: 16px;
+    padding: 8px 16px;
+  }
+}

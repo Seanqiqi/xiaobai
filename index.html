@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>数字馆互动导览</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ==================== 开场视频（播放完毕定格为启动屏） ==================== -->
+  <div id="intro-video-wrap">
+    <video id="intro-video" src="出场动画.mp4" playsinline></video>
+    <div id="intro-skip">跳过</div>
+    <button id="start-btn" class="hidden">点击开始</button>
+  </div>
+
+  <!-- ==================== 主应用 ==================== -->
+  <div id="app">
+    <!-- 背景擦除过渡层 -->
+    <div id="bg-wipe"></div>
+
+    <!-- 张嘴图片全屏覆盖层（用于嘴部动画） -->
+    <div id="speak-overlay"></div>
+
+    <!-- 角色选择栏（左上角，可触摸点击） -->
+    <div id="character-selector"></div>
+
+    <!-- 语音状态指示器（右上角） -->
+    <div id="voice-status">
+      <div id="status-icon"></div>
+      <span id="status-text">准备中</span>
+    </div>
+
+    <!-- 角色展示区（仅显示名字和主题） -->
+    <div id="character-area">
+      <div class="entrance-ring"></div>
+      <div class="entrance-ring"></div>
+      <div id="character-info">
+        <div id="character-name"></div>
+        <div id="character-theme"></div>
+      </div>
+    </div>
+
+    <!-- 打断按钮（说话时显示） -->
+    <button id="interrupt-btn" class="hidden">点击打断</button>
+
+    <!-- 临时识别文字（字幕上方） -->
+    <div id="interim-text"></div>
+
+    <!-- 字幕栏（底部居中） -->
+    <div id="subtitle-bar">
+      <p id="subtitle-text"></p>
+    </div>
+
+    <!-- 浏览器兼容警告 -->
+    <div id="warning" class="hidden"></div>
+  </div>
+
+  <!-- ==================== 脚本 ==================== -->
+  <script src="content.js"></script>
+  <script src="voice.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
