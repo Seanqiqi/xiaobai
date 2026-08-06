@@ -21,6 +21,7 @@ const App = {
   // ---- 唤醒词相关 ----
   _wakeWordResponse: false,  // 标记：当前说话是唤醒词回复，结束后直接进入LISTENING
   _manualInterrupt: false,   // 标记：手动打断，结束后直接进入LISTENING
+  _isApologyResponse: false, // 标记：当前说话是"抱歉"回复，允许停止命令绕过冷却期打断
   _speakStartTime: 0,        // 说话开始时间戳（用于冷却期，避免TTS回声触发唤醒词）
 
   // ---- 空闲超时 ----
@@ -117,7 +118,7 @@ const App = {
     this.el.app.classList.add('entering');
     this._showSubtitle('正在唤醒悦白...');
 
-    // 提前启动STT，用于在说话期间检测唤醒词
+    // 启动STT（待机状态下监听唤醒词；说话期间会自动停止）
     VoiceManager.startListening();
 
     // 动画结束后开始说话（1.2s 角色弹出 + 0.7s 名字淡入 = 约2s）
@@ -156,6 +157,9 @@ const App = {
     VoiceManager.onSpeakStart = () => {
       this._setState('SPEAKING');
       this._speakStartTime = Date.now();
+      // 说话期间停止监听，避免麦克风拾取网页TTS输出的回声导致识别错误
+      // 用户可点击打断按钮中止说话，打断后会自动恢复监听
+      VoiceManager.stopListening();
     };
 
     // 单句语音实际开始播放时才启动嘴部动画
@@ -194,26 +198,46 @@ const App = {
   // ==================== 语音输入处理 ====================
 
   processVoiceInput(text) {
-    // 说话冷却期内忽略STT结果（避免TTS回声触发唤醒词）
-    if (this.state === 'SPEAKING' && this._speakStartTime && Date.now() - this._speakStartTime < 1500) {
-      console.log('[App] 说话冷却期内，忽略STT结果:', text);
-      return;
-    }
-
-    // 1. 唤醒词检测（在 SPEAKING 和 STANDBY 状态下触发唤醒）
-    if ((this.state === 'SPEAKING' || this.state === 'STANDBY') && this._matchCommand(text, 'wake')) {
-      this._handleWakeWord(text);
-      return;
-    }
-
-    // 2. 停止命令（在 SPEAKING 状态下可以停止说话）
-    if (this.state === 'SPEAKING' && this._matchCommand(text, 'stop')) {
+    // 特殊处理：在"抱歉"回复期间，允许停止命令绕过冷却期打断
+    if (this.state === 'SPEAKING' && this._isApologyResponse && this._matchCommand(text, 'stop') && text.length <= 6) {
+      console.log('[App] "抱歉"回复期间检测到停止命令，允许打断:', text);
+      this._isApologyResponse = false;
       VoiceManager.stopSpeaking();
       this._onSpeakEnd();
       return;
     }
 
-    // 3. 其他输入只在 LISTENING 状态处理
+    // 说话冷却期内忽略STT结果（避免TTS回声触发唤醒词）
+    // 每句TTS开始时更新时间戳，冷却期覆盖整个说话过程
+    if (this.state === 'SPEAKING' && this._speakStartTime && Date.now() - this._speakStartTime < 2500) {
+      console.log('[App] 说话冷却期内，忽略STT结果:', text);
+      return;
+    }
+
+    // 1. 唤醒词检测（在 SPEAKING 和 STANDBY 状态下触发唤醒）
+    // SPEAKING状态下，唤醒词文本必须很短（≤6字），过滤TTS回声中偶然包含的"你好"
+    if ((this.state === 'SPEAKING' || this.state === 'STANDBY') && this._matchCommand(text, 'wake')) {
+      if (this.state === 'SPEAKING' && text.length > 6) {
+        console.log('[App] SPEAKING状态下唤醒词文本过长，疑似TTS回声，忽略:', text);
+        return;
+      }
+      this._handleWakeWord(text);
+      return;
+    }
+
+    // 2. 停止命令（在 SPEAKING 状态下可以停止说话）
+    // 同样要求短文本，避免TTS回声中包含"停"等字触发误中断
+    if (this.state === 'SPEAKING' && this._matchCommand(text, 'stop')) {
+      if (text.length > 6) {
+        console.log('[App] SPEAKING状态下停止命令文本过长，疑似TTS回声，忽略:', text);
+        return;
+      }
+      VoiceManager.stopSpeaking();
+      this._onSpeakEnd();
+      return;
+    }
+
+    // 3. 其他输入只在 LISTENING 状态处理（SPEAKING状态下的长文本一律忽略）
     if (this.state !== 'LISTENING') return;
 
     // 在 LISTENING 状态下，如果文本包含唤醒词，去掉唤醒词后处理剩余部分
@@ -222,6 +246,8 @@ const App = {
       processedText = this._stripWakeWord(text);
       if (!processedText || processedText.length < 2) {
         // 只说了"你好"，提示用户提问
+        // 设置标记：回复结束后直接进入LISTENING（不进入STANDBY）
+        this._wakeWordResponse = true;
         this._showSubtitle('嗯，有什么想了解的吗？');
         VoiceManager.speak('嗯，有什么想了解的吗？', this.currentChar.voice);
         return;
@@ -257,10 +283,10 @@ const App = {
       return;
     }
 
-    // 5. 检查角色名（优先匹配两字以上的关键词）
+    // 5. 检查角色名（优先匹配三字以上的关键词，如"白小智""白小垦"等完整角色名）
     for (const char of CHARACTERS) {
       for (const keyword of char.keywords) {
-        if (keyword.length >= 2 && processedText.includes(keyword)) {
+        if (keyword.length >= 3 && processedText.includes(keyword)) {
           if (char.id === this.currentChar.id) {
             // 已在当前角色，重新讲解
             this._narrate(this.currentChar, 'sections');
@@ -272,7 +298,7 @@ const App = {
       }
     }
 
-    // 6. 知识库问答匹配
+    // 6. 知识库问答匹配（在三字角色名未匹配时，优先检查知识库，避免两字主题关键词拦截问答）
     const kbResult = this._matchKnowledgeBase(processedText);
     if (kbResult) {
       // 如果回答角色与当前角色不同，先切换角色再回答
@@ -288,7 +314,21 @@ const App = {
       return;
     }
 
-    // 7. 单字角色名兜底匹配（两字关键词和知识库都没匹配到时）
+    // 7. 两字角色名匹配（知识库未匹配到时，再检查两字关键词）
+    for (const char of CHARACTERS) {
+      for (const keyword of char.keywords) {
+        if (keyword.length === 2 && processedText.includes(keyword)) {
+          if (char.id === this.currentChar.id) {
+            this._narrate(this.currentChar, 'sections');
+          } else {
+            this.switchCharacter(char.id);
+          }
+          return;
+        }
+      }
+    }
+
+    // 8. 单字角色名兜底匹配
     for (const char of CHARACTERS) {
       for (const keyword of char.keywords) {
         if (keyword.length === 1 && processedText.includes(keyword)) {
@@ -302,7 +342,8 @@ const App = {
       }
     }
 
-    // 8. 未匹配 — 给出提示
+    // 9. 未匹配 — 给出提示
+    this._isApologyResponse = true;
     this._showSubtitle('抱歉，我没有听清楚呢。你可以说出小伙伴的名字切换主题，或者问我关于白云街道的问题哦！');
     VoiceManager.speak(
       '抱歉，我没有听清楚呢。你可以说出小伙伴的名字切换主题，或者问我关于白云街道的问题哦！',
@@ -328,10 +369,10 @@ const App = {
 
     if (remaining && remaining.length >= 2) {
       // 用户在说唤醒词的同时也说了更多内容
-      // 先检查是否包含角色名（优先匹配两字以上的关键词）
+      // 先检查是否包含三字以上的角色名（如"白小智""白小垦"等完整角色名）
       for (const char of CHARACTERS) {
         for (const keyword of char.keywords) {
-          if (keyword.length >= 2 && remaining.includes(keyword)) {
+          if (keyword.length >= 3 && remaining.includes(keyword)) {
             // 命中角色名，直接切换角色（唤醒+切换一步到位）
             console.log('[App] 唤醒词+角色名：', char.name);
             this.switchCharacter(char.id);
@@ -347,7 +388,7 @@ const App = {
         return;
       }
 
-      // 检查知识库问答
+      // 检查知识库问答（三字角色名未匹配时，优先检查知识库）
       const kbResult = this._matchKnowledgeBase(remaining);
       if (kbResult) {
         if (kbResult.charId && kbResult.charId !== this.currentChar.id) {
@@ -361,6 +402,17 @@ const App = {
         this._setState('LISTENING');
         VoiceManager.speak(kbResult.answer, this.currentChar.voice);
         return;
+      }
+
+      // 两字角色名匹配（知识库未匹配到时）
+      for (const char of CHARACTERS) {
+        for (const keyword of char.keywords) {
+          if (keyword.length === 2 && remaining.includes(keyword)) {
+            console.log('[App] 唤醒词+两字角色名：', char.name);
+            this.switchCharacter(char.id);
+            return;
+          }
+        }
       }
 
       // 单字角色名兜底匹配
@@ -544,6 +596,8 @@ const App = {
   _onSpeakEnd() {
     // 停止嘴部动画，切回待机图片（00）
     this._stopMouthAnimation();
+    // 重置"抱歉"回复标记
+    this._isApologyResponse = false;
 
     // 如果是唤醒词回复或手动打断，直接进入监听状态（不进入待机）
     if (this._wakeWordResponse || this._manualInterrupt) {

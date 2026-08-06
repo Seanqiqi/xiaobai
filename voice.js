@@ -35,6 +35,8 @@ const VoiceManager = {
   _restartTimer: null,
   _healthCheckTimer: null, // 定期健康检查定时器
   _recognitionRunning: false, // 识别引擎是否正在运行
+  _lastSpokenText: '',    // 最近播放的TTS文本（用于回声过滤）
+  _lastSpokenTime: 0,     // 最近播放时间戳
 
   // ---- 回调 ----
   onRecognize: null,
@@ -153,6 +155,15 @@ const VoiceManager = {
         }
       }
 
+      // TTS回声过滤：说话期间，忽略与最近播放文本高度重叠的识别结果
+      if (this._speaking && this._lastSpokenText) {
+        const echoText = finalText.trim() || interimText.trim();
+        if (echoText && this._isTTSEcho(echoText)) {
+          console.log('[Voice] STT 回声过滤（与TTS文本重叠）:', echoText);
+          return;
+        }
+      }
+
       if (interimText && this.onInterim) {
         this.onInterim(interimText);
       }
@@ -180,7 +191,8 @@ const VoiceManager = {
       this._recognitionRunning = false;
       if (this.onListenEnd) this.onListenEnd();
 
-      // 自动重启：如果应该监听，延迟后重启（说话时也保持监听，用于唤醒词检测）
+      // 自动重启：仅在 _shouldListen 为 true 时（待机/监听状态）重启
+      // 说话期间 _shouldListen 为 false，不会重启，避免拾取TTS回声
       if (this._shouldListen) {
         clearTimeout(this._restartTimer);
         this._restartTimer = setTimeout(() => {
@@ -221,7 +233,6 @@ const VoiceManager = {
   startListening() {
     if (!this.isSupported) return;
     this._shouldListen = true;
-    // 说话时也保持监听，用于唤醒词检测
     this._startRecognition();
     this._startHealthCheck();
   },
@@ -312,6 +323,10 @@ const VoiceManager = {
       // 更新字幕
       if (this.onSubtitle) this.onSubtitle(text);
 
+      // 记录当前播放文本（用于回声过滤）
+      this._lastSpokenText = text;
+      this._lastSpokenTime = Date.now();
+
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'zh-CN';
       utterance.pitch = pitch;
@@ -348,5 +363,42 @@ const VoiceManager = {
       this.synthesis.cancel();
     }
     this._speaking = false;
+    // 清除回声过滤文本（保留5秒后清除，由调用方控制）
+    this._lastSpokenText = '';
+  },
+
+  /**
+   * 判断STT识别结果是否为TTS回声
+   * 规则：识别文本与最近播放的TTS文本有较多重叠字符时判定为回声
+   * @param {string} sttText — STT识别文本
+   * @returns {boolean}
+   */
+  _isTTSEcho(sttText) {
+    if (!this._lastSpokenText) return false;
+    // 短文本（≤4字）不过滤，可能是用户说的唤醒词
+    if (sttText.length <= 4) return false;
+
+    const spoken = this._lastSpokenText.replace(/[\s\p{P}]/gu, '');
+    const recognized = sttText.replace(/[\s\p{P}]/gu, '');
+
+    // 如果识别文本是TTS文本的子串，或TTS文本是识别文本的子串，判定为回声
+    if (spoken.includes(recognized) || recognized.includes(spoken)) {
+      return true;
+    }
+
+    // 计算重叠字符比例
+    let overlapCount = 0;
+    const minLen = Math.min(spoken.length, recognized.length);
+    for (let i = 0; i < recognized.length; i++) {
+      if (spoken.includes(recognized[i])) overlapCount++;
+    }
+    const overlapRatio = overlapCount / recognized.length;
+
+    // 重叠率超过60%且文本较长时，判定为回声
+    if (overlapRatio > 0.6 && recognized.length > 5) {
+      return true;
+    }
+
+    return false;
   }
 };

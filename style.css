@@ -48,7 +48,7 @@ html, body {
   z-index: 1;
   /* 默认背景图（悦白待机图），JS 会动态切换 */
   background-image: url('assets/yuebai_idle.png');
-  background-size: cover;
+  background-size: 100% 100%;
   background-position: center center;
   background-repeat: no-repeat;
   box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
@@ -65,15 +65,16 @@ html, body {
 }
 
 /* 张嘴图片全屏覆盖层（用于嘴部动画，与背景图叠加） */
+/* 使用 100% 100% 确保与 #app 背景图完全对齐，只有嘴巴区域有差异 */
 #speak-overlay {
   position: absolute;
   inset: 0;
   z-index: 1;
-  background-size: cover;
+  background-size: 100% 100%;
   background-position: center center;
   background-repeat: no-repeat;
   opacity: 0;
-  transition: opacity 0.08s ease;
+  transition: none;
   pointer-events: none;
 }
 
@@ -82,7 +83,7 @@ html, body {
   position: absolute;
   inset: 0;
   z-index: 50;
-  background-size: cover;
+  background-size: 100% 100%;
   background-position: center center;
   background-repeat: no-repeat;
   /* 默认完全隐藏（从底部裁剪掉100%） */
@@ -142,12 +143,13 @@ html, body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
   justify-content: flex-start;
   position: relative;
-  padding: 80px 20px 10px;
+  padding: 70px 24px 10px;
   z-index: 3;
   transition: opacity 0.4s ease, transform 0.4s ease;
+  pointer-events: none;
 }
 
 #character-area.switching {
@@ -156,7 +158,7 @@ html, body {
 }
 
 #character-info {
-  text-align: center;
+  text-align: right;
 }
 
 #character-name {
