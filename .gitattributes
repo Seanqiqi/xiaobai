@@ -1,0 +1,27 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Web files - use LF everywhere
+*.html   text eol=lf
+*.js     text eol=lf
+*.css    text eol=lf
+*.json   text eol=lf
+*.svg    text eol=lf
+
+# Python files - use LF
+*.py     text eol=lf
+
+# Windows batch files - MUST use CRLF for CMD to parse correctly
+*.bat    text eol=crlf
+*.cmd    text eol=crlf
+
+# Binary files - don't touch
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.mp4    binary
+*.mp3    binary
+*.wav    binary
+*.ico    binary
+*.webp   binary
