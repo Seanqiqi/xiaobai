@@ -283,7 +283,25 @@ const App = {
       return;
     }
 
-    // 5. 检查角色名（优先匹配三字以上的关键词，如"白小智""白小垦"等完整角色名）
+    // 5. 知识库问答匹配（优先于主题关键词，确保用户提问能被准确回答，
+    //    而不是被"实践营""大陈岛""垦荒精神"等主题词拦截触发角色切换）
+    const kbResult = this._matchKnowledgeBase(processedText);
+    if (kbResult) {
+      // 如果回答角色与当前角色不同，先切换角色再回答（直接回答问题，不说greeting开场白）
+      if (kbResult.charId && kbResult.charId !== this.currentChar.id) {
+        const targetChar = CHARACTERS.find(c => c.id === kbResult.charId);
+        if (targetChar) {
+          this._switchAndAnswer(targetChar, kbResult.answer);
+          return;
+        }
+      }
+      // 用当前角色回答
+      VoiceManager.speak(kbResult.answer, this.currentChar.voice);
+      return;
+    }
+
+    // 6. 检查角色名（三字以上的关键词，如"白小智""白小垦"等完整角色名，
+    //    或未命中知识库的主题词，此时视为切换主题）
     for (const char of CHARACTERS) {
       for (const keyword of char.keywords) {
         if (keyword.length >= 3 && processedText.includes(keyword)) {
@@ -296,22 +314,6 @@ const App = {
           return;
         }
       }
-    }
-
-    // 6. 知识库问答匹配（在三字角色名未匹配时，优先检查知识库，避免两字主题关键词拦截问答）
-    const kbResult = this._matchKnowledgeBase(processedText);
-    if (kbResult) {
-      // 如果回答角色与当前角色不同，先切换角色再回答
-      if (kbResult.charId && kbResult.charId !== this.currentChar.id) {
-        const targetChar = CHARACTERS.find(c => c.id === kbResult.charId);
-        if (targetChar) {
-          this._switchAndAnswer(targetChar, kbResult.answer);
-          return;
-        }
-      }
-      // 用当前角色回答
-      VoiceManager.speak(kbResult.answer, this.currentChar.voice);
-      return;
     }
 
     // 7. 两字角色名匹配（知识库未匹配到时，再检查两字关键词）
@@ -369,7 +371,23 @@ const App = {
 
     if (remaining && remaining.length >= 2) {
       // 用户在说唤醒词的同时也说了更多内容
-      // 先检查是否包含三字以上的角色名（如"白小智""白小垦"等完整角色名）
+      // 优先检查知识库问答（确保提问能被准确回答，而不是被主题词拦截切换角色）
+      const kbResult = this._matchKnowledgeBase(remaining);
+      if (kbResult) {
+        if (kbResult.charId && kbResult.charId !== this.currentChar.id) {
+          const targetChar = CHARACTERS.find(c => c.id === kbResult.charId);
+          if (targetChar) {
+            this._setState('LISTENING');
+            this._switchAndAnswer(targetChar, kbResult.answer);
+            return;
+          }
+        }
+        this._setState('LISTENING');
+        VoiceManager.speak(kbResult.answer, this.currentChar.voice);
+        return;
+      }
+
+      // 检查是否包含三字以上的角色名（如"白小智""白小垦"等完整角色名，或未命中知识库的主题词）
       for (const char of CHARACTERS) {
         for (const keyword of char.keywords) {
           if (keyword.length >= 3 && remaining.includes(keyword)) {
@@ -385,22 +403,6 @@ const App = {
       if (this._matchCommand(remaining, 'stop')) {
         this._setState('LISTENING');
         this._onSpeakEnd();
-        return;
-      }
-
-      // 检查知识库问答（三字角色名未匹配时，优先检查知识库）
-      const kbResult = this._matchKnowledgeBase(remaining);
-      if (kbResult) {
-        if (kbResult.charId && kbResult.charId !== this.currentChar.id) {
-          const targetChar = CHARACTERS.find(c => c.id === kbResult.charId);
-          if (targetChar) {
-            this._setState('LISTENING');
-            this._switchAndAnswer(targetChar, kbResult.answer);
-            return;
-          }
-        }
-        this._setState('LISTENING');
-        VoiceManager.speak(kbResult.answer, this.currentChar.voice);
         return;
       }
 
@@ -486,17 +488,22 @@ const App = {
    * @returns {object|null} — { answer, charId } 或 null
    */
   _matchKnowledgeBase(text) {
-    if (typeof KNOWLEDGE_BASE === 'undefined') return null;
-
+    if (typeof KNOWLEDGE_BASE === 'undefined') {
+      console.warn('[KB] KNOWLEDGE_BASE 未定义!');
+      return null;
+    }
+    console.log('[KB] 匹配文本:', text);
     for (const item of KNOWLEDGE_BASE) {
       // keywords 是二维数组，每个子数组是一组"且"关系的关键词
       // 任意一组全部匹配即命中
       for (const group of item.keywords) {
         if (group.every(kw => text.includes(kw))) {
+          console.log('[KB] 命中:', group, '→ charId:', item.charId);
           return { answer: item.answer, charId: item.charId || null };
         }
       }
     }
+    console.log('[KB] 未命中，将走角色关键词匹配');
     return null;
   },
 
@@ -536,7 +543,7 @@ const App = {
     }, 800);
   },
 
-  switchCharacter(charId) {
+  switchCharacter(charId, skipGreeting = true) {
     const char = CHARACTERS.find(c => c.id === charId);
     if (!char) return;
 
@@ -562,9 +569,9 @@ const App = {
       this._updateDisplay(char);
       this.el.charArea.classList.remove('switching');
 
-      // 播放欢迎语 + 讲解
+      // 播放讲解：skipGreeting=true(语音触发)只说sections，skipGreeting=false(点击角色栏)说greeting+sections
       setTimeout(() => {
-        this._narrate(char, 'all');
+        this._narrate(char, skipGreeting ? 'sections' : 'all');
       }, 500);
     }, 400);
   },
@@ -743,7 +750,7 @@ const App = {
 
       btn.addEventListener('click', () => {
         if (this.state === 'IDLE') return;
-        this.switchCharacter(char.id);
+        this.switchCharacter(char.id, false);  // 点击角色栏触发，说greeting开场白
       });
 
       this.el.charSelector.appendChild(btn);
