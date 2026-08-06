@@ -248,8 +248,8 @@ const App = {
         // 只说了"你好"，提示用户提问
         // 设置标记：回复结束后直接进入LISTENING（不进入STANDBY）
         this._wakeWordResponse = true;
-        this._showSubtitle('嗯，有什么想了解的吗？');
-        VoiceManager.speak('嗯，有什么想了解的吗？', this.currentChar.voice);
+        this._showSubtitle('嗯，我在~');
+        VoiceManager.speak('嗯，我在~', this.currentChar.voice);
         return;
       }
     }
@@ -435,10 +435,10 @@ const App = {
     } else {
       // 只说了唤醒词，切换到监听状态并回复
       this._setState('LISTENING');
-      this._showSubtitle('嗯，我在听，请说出你的问题或要求吧~');
+      this._showSubtitle('嗯，我在~');
       // 设置标记：唤醒回复结束后直接进入LISTENING（不进入STANDBY）
       this._wakeWordResponse = true;
-      VoiceManager.speak('嗯，我在听，请说出你的问题或要求吧~', this.currentChar.voice);
+      VoiceManager.speak('嗯，我在~', this.currentChar.voice);
     }
   },
 
