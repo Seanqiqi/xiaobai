@@ -28,6 +28,7 @@ const CHARACTERS = [
     imageSpeak: 'assets/yuebai_speak.png',
     thumb: 'assets/thumb_yuebai.png',
     bg: 'assets/yuebai_idle.png',
+    entranceVideo: '悦白入场动画.mp4',
     theme: '',
     accent: '#5BB8FF',
     voice: { pitch: 1.2, rate: 1.05 },
@@ -59,6 +60,7 @@ const CHARACTERS = [
     imageSpeak: 'assets/xiaoyun_speak.png',
     thumb: 'assets/thumb_xiaoyun.png',
     bg: 'assets/xiaoyun_idle.png',
+    entranceVideo: '白小韵入场动画.mp4',
     theme: '非遗艺术 · 传统文艺',
     accent: '#A8C5E8',
     voice: { pitch: 1.15, rate: 1.0 },
@@ -88,6 +90,7 @@ const CHARACTERS = [
     imageSpeak: 'assets/xiaozhi_speak.png',
     thumb: 'assets/thumb_xiaozhi.png',
     bg: 'assets/xiaozhi_idle.png',
+    entranceVideo: '白小智入场动画.mp4',
     theme: '智能制造 · 数字科创',
     accent: '#7FD4D4',
     voice: { pitch: 1.1, rate: 1.1 },
@@ -118,6 +121,7 @@ const CHARACTERS = [
     imageSpeak: 'assets/xiaoken_speak.png',
     thumb: 'assets/thumb_xiaoken.png',
     bg: 'assets/xiaoken_idle.png',
+    entranceVideo: '白小垦入场动画.mp4',
     theme: '大陈岛垦荒精神 · 奋斗开拓',
     accent: '#E8A87C',
     voice: { pitch: 1.1, rate: 1.0 },
@@ -140,7 +144,7 @@ const CHARACTERS = [
       '白小恩', '白小嗯',
       // 百/柏 姓氏变体（kěn/gēn/gēng/kǎn 音）
       '百小垦', '柏小垦', '百小肯', '柏小肯', '百小恳', '柏小恳', '百小啃', '柏小啃',
-      '百小坑', '柏小坑', '百小根', '柏小根', '百小跟', '柏小跟',
+      '百小坑', '柏小坑', '百小根', '柏小根', '百小跟', '柏小跟', '百晓can', '柏小can', '百小坎', '柏小坎', '百小砍', '柏小砍', '百小侃', '柏小侃',
       // 百/柏 姓氏变体（kāng/kè/kē 音，新增）
       '百小康', '柏小康', '百小克', '柏小克', '百小科', '柏小科', '百小可', '柏小可',
       // "小白X" 倒序误识别
@@ -179,6 +183,7 @@ const CHARACTERS = [
     imageSpeak: 'assets/xiaowei_speak.png',
     thumb: 'assets/thumb_xiaowei.png',
     bg: 'assets/xiaowei_idle.png',
+    entranceVideo: '白小未入场动画.mp4',
     theme: '未来数字文明 · 数字孪生',
     accent: '#B8A8E8',
     voice: { pitch: 1.2, rate: 1.05 },
@@ -257,7 +262,7 @@ const KNOWLEDGE_BASE = [
   // Q1: 听说白云街道有个超酷的大陈岛垦荒精神实践营，你知道吗？
   {
     keywords: [
-      ['实践营', '知道'], ['实践营', '听说'], ['垦荒少年', '知道'],
+      ['实践营', '知道'], ['实践营', '听说'], ['垦荒营', '知道'],
       ['实践营', '超酷'], ['垦荒', '实践营', '知道']
     ],
     answer: [
@@ -299,7 +304,7 @@ const KNOWLEDGE_BASE = [
   {
     keywords: [
       ['报名', '实践营'], ['参加', '实践营'], ['怎么报名'],
-      ['报名', '垦荒'], ['报名', '追光少年']
+      ['报名', '垦荒'], ['报名', '参加']
     ],
     answer: [
       '关注白云街道的公众号和社区通知，新一期"追光少年·智造行"很快就会开营！',
@@ -319,11 +324,11 @@ const KNOWLEDGE_BASE = [
     ],
     charId: 'xiaoken'
   },
-  // Q6: "追光少年"主题变化说明了什么？
+  // Q6: 追光少年”是我们街道垦荒实践营第四个垦荒少年系列，从去年寒假的“海岛行”，到暑假的“两山行”，再到今年暑期的“智造行”，实践营的每一次主题变化说明了什么？
   {
     keywords: [
       ['追光少年', '变化'], ['追光少年', '主题'], ['海岛行', '两山行', '智造行'],
-      ['追光少年', '说明'], ['追光少年', '迭代']
+      ['追光少年', '说明'], ['追光少年', '迭代'],['主题', '变化']
     ],
     answer: [
       '这说明垦荒精神不是挂在墙上的口号，而是跟着时代走的活的精神！',
@@ -368,8 +373,8 @@ const KNOWLEDGE_BASE = [
   // Q9: 白云街道在台州智造发展中扮演什么样的角色？
   {
     keywords: [
-      ['白云街道', '智造', '角色'], ['白云', '智造', '发展'],
-      ['白云', '台州智造'], ['亿元', '楼宇'], ['白云', '智造', '扮演']
+      ['白云街道', '智造', '角色'], ['白云街道', '智造', '发展'],
+      ['角色', '台州智造'], ['亿元', '楼宇'], ['街道', '智造', '扮演']
     ],
     answer: [
       '白云街道集聚了像腾达中心、远景中心楼宇等好几幢厉害的"亿元楼宇"商务楼宇与创新企业！',
@@ -393,7 +398,7 @@ const KNOWLEDGE_BASE = [
   // Q11: 用"黑科技"提升社区治理水平（阳光码 + AI邻里助手）
   {
     keywords: [
-      ['阳光码', '什么'], ['阳光码', '平台'], ['扫码', '社区'],
+      ['阳光码', '什么'], ['阳光码', '平台'], ['扫码', '社区'],['阳光码', '设计'],
       ['黑科技', '治理'], ['AI', '邻里', '助手'], ['阳光码', '提升']
     ],
     answer: [
@@ -408,7 +413,7 @@ const KNOWLEDGE_BASE = [
   {
     keywords: [
       ['低空经济'], ['低空经济', '白云'], ['低空经济', '应用'],
-      ['低空经济', '场景']
+      ['低空经济', '场景'],['经济', '应用场景']
     ],
     answer: [
       '在未来，针对我们白云写字楼里面的白领，外卖和快递可能将通过无人机精准投送至写字楼的"空中快递站"，',

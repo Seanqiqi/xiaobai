@@ -59,7 +59,9 @@ const App = {
       interruptBtn:  document.getElementById('interrupt-btn'),
       introVideo:    document.getElementById('intro-video'),
       introVideoWrap: document.getElementById('intro-video-wrap'),
-      introSkip:     document.getElementById('intro-skip')
+      introSkip:     document.getElementById('intro-skip'),
+      yuebaiEntranceVideo: document.getElementById('entrance-video'),
+      yuebaiEntranceWrap:  document.getElementById('entrance-video-wrap')
     };
 
     // 渲染角色选择按钮
@@ -113,20 +115,73 @@ const App = {
     this.charIndex = 0;
     this._updateDisplay(this.currentChar);
 
-    // 触发进场动画
-    this.el.charArea.classList.add('entering');
-    this.el.app.classList.add('entering');
-    this._showSubtitle('正在唤醒悦白...');
-
     // 启动STT（待机状态下监听唤醒词；说话期间会自动停止）
     VoiceManager.startListening();
 
-    // 动画结束后开始说话（1.2s 角色弹出 + 0.7s 名字淡入 = 约2s）
-    setTimeout(() => {
-      this.el.charArea.classList.remove('entering');
-      this.el.app.classList.remove('entering');
-      this._narrate(this.currentChar, 'greeting');
-    }, 2000);
+    // 播放入场动画，视频结束后再显示角色并说开场白
+    this._playEntranceVideo(this.currentChar, () => this._showCharacterAndGreet());
+  },
+
+  /**
+   * 播放角色入场动画视频，播放完毕后回调
+   * 视频结束 → 定格最后一帧 → 淡出过渡 → 回调（显示角色图片）
+   * @param {object} char — 角色对象（需含 entranceVideo 字段）
+   * @param {function} callback — 视频结束后的回调
+   */
+  _playEntranceVideo(char, callback) {
+    const video = this.el.yuebaiEntranceVideo;
+    const wrap = this.el.yuebaiEntranceWrap;
+
+    // 没有视频元素或该角色没有入场视频，直接回调
+    if (!video || !wrap || !char.entranceVideo) {
+      callback();
+      return;
+    }
+
+    // 设置视频源并重置状态
+    video.src = char.entranceVideo;
+    video.currentTime = 0;
+    wrap.classList.remove('fading-out');
+    wrap.classList.add('playing');
+
+    // 播放结束后的处理：定格最后一帧 → 淡出 → 回调
+    const onVideoEnd = () => {
+      video.removeEventListener('ended', onVideoEnd);
+      video.pause(); // 定格在最后一帧
+
+      // 淡出揭示下方图片（0.4s）
+      wrap.classList.add('fading-out');
+      setTimeout(() => {
+        wrap.classList.remove('playing');
+        wrap.classList.remove('fading-out');
+        callback();
+      }, 400);
+    };
+
+    video.addEventListener('ended', onVideoEnd);
+
+    // 尝试播放（带自动播放失败降级处理）
+    const playPromise = video.play();
+    if (playPromise) {
+      playPromise.catch(() => {
+        // 自动播放被阻止，静音后重试
+        video.muted = true;
+        video.play().catch(() => {
+          // 仍然失败，直接跳过视频
+          video.removeEventListener('ended', onVideoEnd);
+          wrap.classList.remove('playing');
+          wrap.classList.remove('fading-out');
+          callback();
+        });
+      });
+    }
+  },
+
+  /**
+   * 入场视频结束后直接播放开场白
+   */
+  _showCharacterAndGreet() {
+    this._narrate(this.currentChar, 'greeting');
   },
 
   // ==================== 语音回调设置 ====================
@@ -475,10 +530,14 @@ const App = {
 
     setTimeout(() => {
       this._updateDisplay(char);
-      this.el.charArea.classList.remove('switching');
-      setTimeout(() => {
-        VoiceManager.speak(answer, char.voice);
-      }, 400);
+
+      // 播放入场动画，结束后显示角色并回答问题
+      this._playEntranceVideo(char, () => {
+        this.el.charArea.classList.remove('switching');
+        setTimeout(() => {
+          VoiceManager.speak(answer, char.voice);
+        }, 400);
+      });
     }, 400);
   },
 
@@ -564,15 +623,18 @@ const App = {
     // 触发背景擦除切换
     this._switchBackground(char.bg);
 
-    // 在擦除动画进行到一半时切换角色图片
+    // 在擦除动画进行到一半时切换角色图片，然后播放入场动画
     setTimeout(() => {
       this._updateDisplay(char);
-      this.el.charArea.classList.remove('switching');
 
-      // 播放讲解：skipGreeting=true(语音触发)只说sections，skipGreeting=false(点击角色栏)说greeting+sections
-      setTimeout(() => {
-        this._narrate(char, skipGreeting ? 'sections' : 'all');
-      }, 500);
+      // 播放入场动画，结束后显示角色并播放讲解
+      this._playEntranceVideo(char, () => {
+        this.el.charArea.classList.remove('switching');
+        // 播放讲解：skipGreeting=true(语音触发)只说sections，skipGreeting=false(点击角色栏)说greeting+sections
+        setTimeout(() => {
+          this._narrate(char, skipGreeting ? 'sections' : 'all');
+        }, 500);
+      });
     }, 400);
   },
 
