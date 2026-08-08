@@ -602,7 +602,7 @@ const App = {
     }, 800);
   },
 
-  switchCharacter(charId, skipGreeting = true) {
+  switchCharacter(charId, skipGreeting = false) {
     const char = CHARACTERS.find(c => c.id === charId);
     if (!char) return;
 
@@ -630,7 +630,8 @@ const App = {
       // 播放入场动画，结束后显示角色并播放讲解
       this._playEntranceVideo(char, () => {
         this.el.charArea.classList.remove('switching');
-        // 播放讲解：skipGreeting=true(语音触发)只说sections，skipGreeting=false(点击角色栏)说greeting+sections
+        // 播放讲解：默认说greeting+sections+prompt(切换角色时触发开场白)；
+        // skipGreeting=true 时只说 sections（仅用于"重复讲解"等不需要开场的场景）
         setTimeout(() => {
           this._narrate(char, skipGreeting ? 'sections' : 'all');
         }, 500);
@@ -812,7 +813,7 @@ const App = {
 
       btn.addEventListener('click', () => {
         if (this.state === 'IDLE') return;
-        this.switchCharacter(char.id, false);  // 点击角色栏触发，说greeting开场白
+        this.switchCharacter(char.id);  // 点击角色栏触发，说greeting开场白
       });
 
       this.el.charSelector.appendChild(btn);
