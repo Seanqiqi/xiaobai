@@ -12,7 +12,8 @@
  *   thumb     — 角色选择栏缩略图
  *   theme     — 主题标签（显示在角色名下方）
  *   accent    — 主题色（用于 UI 高亮）
- *   voice     — TTS 参数：pitch 音调(0-2)、rate 语速(0.1-10)
+ *   voice     — TTS 参数：pitch 音调(0-2，1.5+偏童趣)、rate 语速(0.1-10)
+ *               注：若系统选中童声语音(Xiaoshuang)，pitch 会被自动封顶 1.3 防止过尖
  *   keywords  — 语音识别关键词，匹配任意一个即切换到该角色
  *               已包含大量同音字、谐音字、近似发音，提高识别率
  *   greeting  — 角色出场时的欢迎语
@@ -31,7 +32,7 @@ const CHARACTERS = [
     entranceVideo: '悦白入场动画.mp4',
     theme: '',
     accent: '#5BB8FF',
-    voice: { pitch: 1.2, rate: 1.05 },
+    voice: { pitch: 1.6, rate: 1.0 },
     keywords: [
       '悦白', '月白', '越白', '乐白', '岳白', '粤白', '阅白', '曰白', '约白', '跃白',
       '悦百', '悦拜', '月百', '越百', '乐百', '岳百', '粤百', '阅百', '约百', '跃百',
@@ -63,7 +64,7 @@ const CHARACTERS = [
     entranceVideo: '白小韵入场动画.mp4',
     theme: '非遗艺术 · 传统文艺',
     accent: '#A8C5E8',
-    voice: { pitch: 1.15, rate: 1.0 },
+    voice: { pitch: 1.55, rate: 0.95 },
     keywords: [
       '白小韵', '白小运', '白小云', '白小允', '白小晕', '白小孕', '白小匀', '白小耘', '白小熨', '白小蕴',
       '百小韵', '柏小韵', '百小云', '柏小云', '百小运', '柏小运', '百小允', '柏小允', '百小晕', '柏小晕',
@@ -93,7 +94,7 @@ const CHARACTERS = [
     entranceVideo: '白小智入场动画.mp4',
     theme: '智能制造 · 数字科创',
     accent: '#7FD4D4',
-    voice: { pitch: 1.1, rate: 1.1 },
+    voice: { pitch: 1.6, rate: 1.0 },
     keywords: [
       '白小智', '白小指', '白小治', '白小志', '白小置', '白小致', '白小稚', '白小质', '白小知', '白小织',
       '百小智', '柏小智', '百小指', '柏小指', '百小治', '柏小治', '百小志', '柏小志', '百小致', '柏小致',
@@ -124,7 +125,7 @@ const CHARACTERS = [
     entranceVideo: '白小垦入场动画.mp4',
     theme: '大陈岛垦荒精神 · 奋斗开拓',
     accent: '#E8A87C',
-    voice: { pitch: 1.1, rate: 1.0 },
+    voice: { pitch: 1.55, rate: 0.95 },
     keywords: [
       // 标准名 + 常见误识别（kěn 音）
       '白小垦', '白小肯', '白小恳', '白小啃', '白小坑', '白小铿',
@@ -186,7 +187,7 @@ const CHARACTERS = [
     entranceVideo: '白小未入场动画.mp4',
     theme: '未来数字文明 · 数字孪生',
     accent: '#B8A8E8',
-    voice: { pitch: 1.2, rate: 1.05 },
+    voice: { pitch: 1.6, rate: 1.0 },
     keywords: [
       // 标准名 + wèi/wēi 音常见误识别（含"白小薇"）
       '白小未', '白小卫', '白小位', '白小魏', '白小蔚', '白小为', '白小韦', '白小微', '白小味', '白小胃', '白小薇',

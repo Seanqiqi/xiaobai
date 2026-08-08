@@ -248,6 +248,22 @@ const App = {
       }
       // STANDBY 状态不更新UI，保持"待机中"
     };
+
+    // 语音加载完成（在线Neural/童声）
+    VoiceManager.onVoiceReady = (voice, isChild, isOnline) => {
+      if (isOnline) {
+        console.log('[App] 语音就绪:', voice.name, isChild ? '童声' : '在线Neural');
+      }
+    };
+
+    // 未找到在线Neural语音，提示用户
+    VoiceManager.onVoiceWarning = (voice) => {
+      this._showWarning(
+        '当前使用的是系统本地语音（' + voice.name + '），音质一般。\n' +
+        '推荐使用 Microsoft Edge 浏览器并确保已启用"在线语音"：\n' +
+        'Edge 设置 → 语言和内容 → 打开"在线语音"功能，即可获得童趣自然语音。'
+      );
+    };
   },
 
   // ==================== 语音输入处理 ====================

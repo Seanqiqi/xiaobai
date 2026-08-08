@@ -28,6 +28,7 @@ const VoiceManager = {
   recognition: null,
   voices: [],
   chineseVoice: null,
+  _isChildVoice: false,   // 当前选中的是否为童声语音（用于音调自适应）
 
   _listening: false,
   _speaking: false,
@@ -37,6 +38,8 @@ const VoiceManager = {
   _recognitionRunning: false, // 识别引擎是否正在运行
   _lastSpokenText: '',    // 最近播放的TTS文本（用于回声过滤）
   _lastSpokenTime: 0,     // 最近播放时间戳
+  _voicePollTimer: null,  // 语音轮询定时器（等待Edge在线Neural语音加载）
+  _voiceLoadCount: 0,     // 语音加载次数计数
 
   // ---- 回调 ----
   onRecognize: null,
@@ -47,6 +50,8 @@ const VoiceManager = {
   onUtteranceStart: null, // 单句语音实际开始播放时触发（用于嘴部动画同步）
   onListenStart: null,
   onListenEnd: null,
+  onVoiceReady: null,     // 语音加载完成时触发（voice, isChild, isOnline）
+  onVoiceWarning: null,   // 未找到在线Neural语音时触发（voice）
 
   // ---- 兼容性检测 ----
   isSupported: false,
@@ -66,47 +71,116 @@ const VoiceManager = {
       return;
     }
 
+    this._voiceLoadCount = 0;
+    this._voicePollTimer = null;
+
     const loadVoices = () => {
+      this._voiceLoadCount++;
       this.voices = this.synthesis.getVoices();
 
       // 打印所有可用语音，方便调试
-      const zhVoices = this.voices.filter(v => v.lang.startsWith('zh'));
-      console.log('[Voice] 可用中文语音:', zhVoices.map(v => `${v.name} (${v.lang})`).join(', '));
+      const zhVoices = this.voices.filter(v => v.lang && v.lang.startsWith('zh'));
+      console.log(`[Voice] 第${this._voiceLoadCount}次加载，中文语音(${zhVoices.length}个):`,
+        zhVoices.map(v => `${v.name} (${v.lang})`).join(' | '));
 
-      // 智能选择最佳中文语音
-      // 优先级：Google语音 > 微软自然语音 > 微软女声 > 任意中文
-      this.chineseVoice =
-        // 1. Google 中文语音（Chrome内置，音质最好）
-        this.voices.find(v => v.lang === 'zh-CN' && /google/i.test(v.name)) ||
-        this.voices.find(v => v.lang.startsWith('zh') && /google/i.test(v.name)) ||
-        // 2. 微软晓晓（自然语音，音质好）
-        this.voices.find(v => v.lang === 'zh-CN' && /xiaoxiao/i.test(v.name)) ||
-        // 3. 微软瑶瑶（声音年轻自然）
-        this.voices.find(v => v.lang === 'zh-CN' && /yaoyao/i.test(v.name)) ||
-        // 4. 微软慧慧（系统默认女声）
-        this.voices.find(v => v.lang === 'zh-CN' && /huihui/i.test(v.name)) ||
-        // 5. 任意中文女声
-        this.voices.find(v => v.lang === 'zh-CN' && /female|女/i.test(v.name)) ||
-        // 6. 任意zh-CN语音
-        this.voices.find(v => v.lang === 'zh-CN') ||
-        this.voices.find(v => v.lang.startsWith('zh')) ||
-        this.voices[0] ||
-        null;
+      // 选择最佳语音
+      const prevVoice = this.chineseVoice;
+      const prevIsOnline = prevVoice && /online|natural/i.test(prevVoice.name);
+      const newVoice = this._selectBestVoice();
+      const newIsOnline = newVoice && /online|natural/i.test(newVoice.name);
 
-      if (this.chineseVoice) {
-        console.log('[Voice] 已选择 TTS 语音:', this.chineseVoice.name, this.chineseVoice.lang);
+      // 不降级保护：已有在线Neural语音时，不切换到本地语音
+      if (prevIsOnline && newVoice && !newIsOnline) {
+        console.log('[Voice] 已有在线Neural语音，跳过本地语音:', newVoice.name);
       } else {
-        console.warn('[Voice] 未找到中文语音，将使用默认语音');
+        this.chineseVoice = newVoice;
+      }
+
+      // 判断是否为童声语音（匹配中英文名）
+      this._isChildVoice = !!(this.chineseVoice && /xiaoshuang|晓双/i.test(this.chineseVoice.name));
+
+      // 语音发生变化时打印日志
+      if (this.chineseVoice && this.chineseVoice !== prevVoice) {
+        const voiceType = this._isChildVoice ? '童声' : (newIsOnline ? '在线Neural' : '本地');
+        console.log(`[Voice] ✓ 已切换 TTS 语音: ${this.chineseVoice.name} [${voiceType}]`);
+        // 通过回调通知 UI
+        if (this.onVoiceReady) this.onVoiceReady(this.chineseVoice, this._isChildVoice, newIsOnline);
+      }
+
+      // 如果已找到在线Neural语音，停止轮询
+      if (this.chineseVoice && /online|natural/i.test(this.chineseVoice.name)) {
+        if (this._voicePollTimer) {
+          clearInterval(this._voicePollTimer);
+          this._voicePollTimer = null;
+          console.log('[Voice] 已找到在线Neural语音，停止轮询');
+        }
       }
     };
 
+    // 初始加载
     loadVoices();
-    // Chrome 异步加载语音
+
+    // 监听 voiceschanged 事件（Chrome/Edge 异步加载语音时触发）
     if (this.synthesis.addEventListener) {
       this.synthesis.addEventListener('voiceschanged', loadVoices);
     }
-    // 兜底：延迟再加载一次
-    setTimeout(loadVoices, 500);
+
+    // 轮询兜底：Edge在线Neural语音可能延迟数秒才加载，每500ms检测一次，持续10秒
+    this._voicePollTimer = setInterval(() => {
+      if (this._voiceLoadCount >= 20) {
+        clearInterval(this._voicePollTimer);
+        this._voicePollTimer = null;
+        // 10秒后仍未找到在线Neural语音，给出提示
+        if (this.chineseVoice && !/online|natural/i.test(this.chineseVoice.name)) {
+          console.warn('[Voice] ⚠ 10秒内未加载到在线Neural语音，当前使用本地语音:', this.chineseVoice.name);
+          console.warn('[Voice] 提示：请在Edge设置 → 语言和内容 → 确保已启用"在线语音"功能，且浏览器联网');
+          if (this.onVoiceWarning) this.onVoiceWarning(this.chineseVoice);
+        }
+        return;
+      }
+      loadVoices();
+    }, 500);
+  },
+
+  /**
+   * 选择最佳中文语音（童趣优先，在线Neural优先）
+   * 同时匹配英文名(Xiaoyi)和中文名(晓伊)，因为Edge在线语音用中文名，本地SAPI用英文名
+   */
+  _selectBestVoice() {
+    const isZh = v => v.lang && (v.lang === 'zh-CN' || v.lang === 'zh-Hans' || v.lang.startsWith('zh'));
+    const match = (re) => this.voices.find(v => isZh(v) && re.test(v.name));
+
+    return (
+      // 1. 童声晓双（zh-CN-XiaoshuangNeural，真正的童声）
+      match(/xiaoshuang|晓双/i) ||
+      // 2. 晓伊（年轻活泼女声，最接近童趣效果）
+      match(/xiaoyi|晓伊/i) ||
+      // 3. 晓梦（甜美可爱女声）
+      match(/xiaomeng|晓梦/i) ||
+      // 4. 晓萱（活力女声）
+      match(/xiaoxuan|晓萱/i) ||
+      // 5. 晓悠（悠扬女声，支持cheerful/cute风格）
+      match(/xiaoyou|晓悠/i) ||
+      // 6. Google 中文语音（Chrome内置，音质好）
+      match(/google/i) ||
+      // 7. 晓晓（自然语音，音质好）
+      match(/xiaoxiao|晓晓/i) ||
+      // 8. 瑶瑶（本地年轻女声）
+      match(/yaoyao/i) ||
+      // 9. 任意在线Neural中文女声（名字含Online/Natural且含"晓"字）
+      this.voices.find(v => isZh(v) && /online|natural/i.test(v.name) && /晓/i.test(v.name)) ||
+      // 10. 任意在线Neural中文语音
+      this.voices.find(v => isZh(v) && /online|natural/i.test(v.name)) ||
+      // 11. 慧慧（本地女声）
+      match(/huihui/i) ||
+      // 12. 任意中文女声
+      this.voices.find(v => v.lang === 'zh-CN' && /female|女/i.test(v.name)) ||
+      // 13. 任意zh-CN语音
+      this.voices.find(v => v.lang === 'zh-CN') ||
+      this.voices.find(v => isZh(v)) ||
+      this.voices[0] ||
+      null
+    );
   },
 
   // ---- STT 初始化 ----
@@ -282,6 +356,8 @@ const VoiceManager = {
    * 逐句朗读文本数组，每句开始时触发 onSubtitle 回调
    * @param {string[]} sentences — 要朗读的文本数组
    * @param {object} voiceConfig — { pitch: 0-2, rate: 0.1-10 }
+   *               pitch 默认 1.6（童趣偏高音）；若已选中童声语音则自动封顶 1.3
+   *               rate  默认 1.0
    */
   speak(sentences, voiceConfig = {}) {
     if (!this.synthesis) {
@@ -298,8 +374,12 @@ const VoiceManager = {
 
     // 确保是数组
     const lines = Array.isArray(sentences) ? sentences : [sentences];
-    const pitch = voiceConfig.pitch ?? 1.15;
-    const rate = voiceConfig.rate ?? 1.05;
+    // 童趣音调：默认提高音调模拟童声；若已选中童声语音则适当降低，避免过度尖锐
+    let pitch = voiceConfig.pitch ?? 1.6;
+    const rate = voiceConfig.rate ?? 1.0;
+    if (this._isChildVoice) {
+      pitch = Math.min(pitch, 1.3); // 童声语音本身已童趣，音调封顶1.3
+    }
 
     let index = 0;
 
