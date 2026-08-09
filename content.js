@@ -29,7 +29,7 @@ const CHARACTERS = [
     imageSpeak: 'assets/yuebai_speak.png',
     thumb: 'assets/thumb_yuebai.png',
     bg: 'assets/yuebai_idle.png',
-    entranceVideo: '悦白入场动画.mp4',
+    entranceVideo: 'yuebai-1.mp4',
     theme: '',
     accent: '#5BB8FF',
     voice: { pitch: 1.6, rate: 1.0 },
@@ -62,7 +62,7 @@ const CHARACTERS = [
     imageSpeak: 'assets/xiaoyun_speak.png',
     thumb: 'assets/thumb_xiaoyun.png',
     bg: 'assets/xiaoyun_idle.png',
-    entranceVideo: '白小韵入场动画.mp4',
+    entranceVideo: 'xiaoyun-1.mp4',
     theme: '非遗艺术 · 传统文艺',
     accent: '#A8C5E8',
     voice: { pitch: 1.55, rate: 0.95 },
@@ -94,7 +94,7 @@ const CHARACTERS = [
     imageSpeak: 'assets/xiaozhi_speak.png',
     thumb: 'assets/thumb_xiaozhi.png',
     bg: 'assets/xiaozhi_idle.png',
-    entranceVideo: '白小智入场动画.mp4',
+    entranceVideo: 'xiaozhi-1.mp4',
     theme: '智能制造 · 数字科创',
     accent: '#7FD4D4',
     voice: { pitch: 1.6, rate: 1.0 },
@@ -129,7 +129,7 @@ const CHARACTERS = [
     imageSpeak: 'assets/xiaoken_speak.png',
     thumb: 'assets/thumb_xiaoken.png',
     bg: 'assets/xiaoken_idle.png',
-    entranceVideo: '白小垦入场动画.mp4',
+    entranceVideo: 'xiaoken-1.mp4',
     theme: '大陈岛垦荒精神 · 奋斗开拓',
     accent: '#E8A87C',
     voice: { pitch: 1.55, rate: 0.95 },
@@ -147,7 +147,7 @@ const CHARACTERS = [
       // kè/kē 音（新增）
       '白小克', '白小客', '白小刻', '白小壳', '白小科', '白小颗', '白小咳',
       // kě 音（新增）
-      '白小可',
+      '白小可','白小can','白晓can',
       // ēn/én 音（新增，近似韵母）
       '白小恩', '白小嗯',
       // 百/柏 姓氏变体（kěn/gēn/gēng/kǎn 音）
@@ -191,7 +191,7 @@ const CHARACTERS = [
     imageSpeak: 'assets/xiaowei_speak.png',
     thumb: 'assets/thumb_xiaowei.png',
     bg: 'assets/xiaowei_idle.png',
-    entranceVideo: '白小未入场动画.mp4',
+    entranceVideo: 'xiaowei-1.mp4',
     theme: '未来数字文明 · 数字孪生',
     accent: '#B8A8E8',
     voice: { pitch: 1.6, rate: 1.0 },
