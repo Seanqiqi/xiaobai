@@ -181,7 +181,7 @@ const App = {
    * 入场视频结束后直接播放开场白
    */
   _showCharacterAndGreet() {
-    this._narrate(this.currentChar, 'greeting');
+    this._narrate(this.currentChar, 'all');
   },
 
   // ==================== 语音回调设置 ====================
