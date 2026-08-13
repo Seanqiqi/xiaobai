@@ -170,12 +170,9 @@ html, body {
 /* ==================== 角色展示区 ==================== */
 #character-area {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: flex-start;
+  display: block;               /* 改为 block，让内部绝对定位生效 */
   position: relative;
-  padding: 70px 24px 10px;
+  padding: 0;
   z-index: 3;
   transition: opacity 0.4s ease, transform 0.4s ease;
   pointer-events: none;
@@ -187,25 +184,83 @@ html, body {
 }
 
 #character-info {
-  text-align: right;
+  /* 绝对定位到画面顶部约 1/4 处（人物头部上方），水平居中 */
+  position: absolute;
+  top: 4%;                      /* 距画面顶部 4%，位于人物正上方而非画面正中 */
+  left: 58%;                      /* 往右偏移，对齐人物正上方 */
+  transform: translateX(-50%);
+  text-align: center;
+  z-index: 4;
 }
 
+/* 名字容器左右各一条装饰横线 */
+#character-info::before,
+#character-info::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 28px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent) 50%,
+    transparent 100%
+  );
+  opacity: 0.85;
+}
+#character-info::before { left: -36px; }
+#character-info::after  { right: -36px; }
+
 #character-name {
-  font-size: clamp(1.8rem, 3.5vw, 3rem);
-  font-weight: 700;
-  letter-spacing: 0.15em;
-  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.8), 0 0 30px var(--accent);
-  margin-bottom: 0.2em;
-  transition: color 0.4s ease;
+  font-size: clamp(2.2rem, 4.8vw, 4rem);
+  font-weight: 800;
+  letter-spacing: 0.28em;
+  line-height: 1.1;
+  margin-bottom: 0.18em;
+  /* 渐变填充：白 → 主题色，文字本身带光泽 */
+  background: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    var(--accent) 60%,
+    color-mix(in srgb, var(--accent) 70%, #ffffff) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
   color: var(--accent);
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.9))
+          drop-shadow(0 0 24px var(--accent));
+  padding-left: 0.28em;
+  transition: filter 0.4s ease;
 }
 
 #character-theme {
-  font-size: clamp(0.85rem, 1.5vw, 1.3rem);
-  color: var(--text-muted);
-  letter-spacing: 0.1em;
-  margin-bottom: 0.8em;
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.8);
+  font-size: clamp(0.9rem, 1.6vw, 1.3rem);
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: 0.32em;
+  font-weight: 500;
+  position: relative;
+  padding: 4px 0 0;
+  text-shadow:
+    0 0 3px rgba(255, 255, 255, 0.6),
+    0 1px 6px rgba(0, 0, 0, 0.9);
+}
+
+/* 主题标签下方加一条主题色细光带 */
+#character-theme::after {
+  content: '';
+  display: block;
+  width: 60%;
+  height: 1px;
+  margin: 8px auto 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent) 50%,
+    transparent 100%
+  );
+  opacity: 0.7;
 }
 
 /* ==================== 进场动画 ==================== */
