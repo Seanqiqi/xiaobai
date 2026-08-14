@@ -30,7 +30,7 @@ const CHARACTERS = [
     thumb: 'assets/thumb_yuebai.png',
     bg: 'assets/yuebai_idle.png',
     entranceVideo: 'yuebai-1.mp4',
-    theme: '',
+    theme: '数字导览·互动讲解',
     accent: '#5BB8FF',
     voice: { pitch: 1.6, rate: 1.0 },
     keywords: [

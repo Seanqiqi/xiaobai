@@ -77,8 +77,8 @@ html, body {
   z-index: 1;
   /* 默认背景图（悦白待机图），JS 会动态切换 */
   background-image: url('assets/yuebai_idle.png');
-  background-size: 100% 100%;
-  background-position: center center;
+  background-size: 104% 100%;      /* 横向放大4%，配合右对齐让人物左移2%趋近中心 */
+  background-position: 100% center;
   background-repeat: no-repeat;
   box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
 }
@@ -99,8 +99,8 @@ html, body {
   position: absolute;
   inset: 0;
   z-index: 1;
-  background-size: 100% 100%;
-  background-position: center center;
+  background-size: 104% 100%;
+  background-position: 100% center;
   background-repeat: no-repeat;
   opacity: 0;
   transition: none;
@@ -112,8 +112,8 @@ html, body {
   position: absolute;
   inset: 0;
   z-index: 50;
-  background-size: 100% 100%;
-  background-position: center center;
+  background-size: 104% 100%;
+  background-position: 100% center;
   background-repeat: no-repeat;
   /* 默认完全隐藏（从底部裁剪掉100%） */
   clip-path: inset(0 0 100% 0);
@@ -187,7 +187,7 @@ html, body {
   /* 绝对定位到画面顶部约 1/4 处（人物头部上方），水平居中 */
   position: absolute;
   top: 4%;                      /* 距画面顶部 4%，位于人物正上方而非画面正中 */
-  left: 58%;                      /* 往右偏移，对齐人物正上方 */
+  left: 50%;                      /* 往右偏移，对齐人物正上方 */
   transform: translateX(-50%);
   text-align: center;
   z-index: 4;
@@ -248,7 +248,7 @@ html, body {
 }
 
 /* 主题标签下方加一条主题色细光带 */
-#character-theme::after {
+/* #character-theme::after {
   content: '';
   display: block;
   width: 60%;
@@ -261,7 +261,7 @@ html, body {
     transparent 100%
   );
   opacity: 0.7;
-}
+} */
 
 /* ==================== 进场动画 ==================== */
 
@@ -358,7 +358,7 @@ html, body {
 }
 
 #subtitle-text {
-  font-size: clamp(1.2rem, 2.4vw, 2.2rem);
+  font-size: clamp(0.95rem, 1.8vw, 1.6rem);
   text-align: center;
   max-width: 85%;
   line-height: 1.6;
@@ -506,12 +506,15 @@ html, body {
 /* ==================== 开场视频（播放完毕定格为启动屏） ==================== */
 #intro-video-wrap {
   position: fixed;
-  inset: 0;
+  inset: 2vh 2vw;               /* 四周留出和待机画面一致的边距，露出深色边框 */
   z-index: 200;
   background: #000;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 16px;          /* 圆角与 #app 保持一致 */
+  overflow: hidden;
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
 }
 
 #intro-video-wrap.hidden {
