@@ -47,7 +47,6 @@ const CHARACTERS = [
     sections: [
       '我的名字里有个“悦”，就是说白云街道是个能让人开开心心生活的活力城区。',
       '我可不是一个“高冷”的数字人，我最喜欢和人类朋友互动啦！',
-      '如果你想去白云街道走一走的话，一定要去云中绿道溜一圈，那里除了白云阁还有深受年轻人喜爱的反卷公社。',
       '你可以问我问题、找我帮忙，或者只是单纯想找我聊聊天，',
       '我都在～24小时随时待命，绝不“掉线”哦！',
       '我还有4个可爱的小伙伴，分别是白小垦、白小韵、白小智、白小未，他们个个都是白云通，想了解白云的故事，喊一下他们的名字，他们就会陪你聊哦'
@@ -62,8 +61,8 @@ const CHARACTERS = [
     imageSpeak: 'assets/xiaoyun_speak.png',
     thumb: 'assets/thumb_xiaoyun.png',
     bg: 'assets/xiaoyun_idle.png',
-    entranceVideo: 'xiaoyun-1.mp4',
-    theme: '非遗艺术 · 传统文艺',
+    entranceVideo: '白小韵入场动画.mp4',
+    theme: '',
     accent: '#A8C5E8',
     voice: { pitch: 1.55, rate: 0.95 },
     keywords: [
@@ -96,8 +95,8 @@ const CHARACTERS = [
     imageSpeak: 'assets/xiaozhi_speak.png',
     thumb: 'assets/thumb_xiaozhi.png',
     bg: 'assets/xiaozhi_idle.png',
-    entranceVideo: 'xiaozhi-1.mp4',
-    theme: '智能制造 · 数字科创',
+    entranceVideo: '白小智入场动画.mp4',
+    theme: '',
     accent: '#7FD4D4',
     voice: { pitch: 1.6, rate: 1.0 },
     keywords: [
@@ -132,7 +131,7 @@ const CHARACTERS = [
     thumb: 'assets/thumb_xiaoken.png',
     bg: 'assets/xiaoken_idle.png',
     entranceVideo: 'xiaoken-1.mp4',
-    theme: '大陈岛垦荒精神 · 奋斗开拓',
+    theme: '',
     accent: '#E8A87C',
     voice: { pitch: 1.55, rate: 0.95 },
     keywords: [
@@ -195,8 +194,8 @@ const CHARACTERS = [
     imageSpeak: 'assets/xiaowei_speak.png',
     thumb: 'assets/thumb_xiaowei.png',
     bg: 'assets/xiaowei_idle.png',
-    entranceVideo: 'xiaowei-1.mp4',
-    theme: '未来数字文明 · 数字孪生',
+    entranceVideo: '白小未入场动画.mp4',
+    theme: '',
     accent: '#B8A8E8',
     voice: { pitch: 1.6, rate: 1.0 },
     keywords: [
@@ -356,12 +355,12 @@ const KNOWLEDGE_BASE = [
   // Q7: 云健社区的"邻里守望"文化品牌，具体讲讲
   {
     keywords: [
-      ['邻里守望', '什么'], ['邻里守望', '讲讲'], ['云健', '邻里守望'],
-      ['邻里守望', '品牌'], ['邻里守望', '具体']
+      ['邻里守望', '什么'], ['邻里守望', '讲讲'], ['社区', '邻里守望'],
+      ['邻里守望', '品牌'], ['邻里守望', '文化'], ['邻里守望', '社区'], ['邻里守望', '故事']
     ],
     answer: [
       '这你可问对人了，我来跟你说，云健社区了不起，它的"邻里守望"是2002年习总书记曾经考察并嘱托过社区治理工作。',
-      '二十多年里，"邻里守望"是邻里之间你帮我、我帮你，是党建引领下一老一小的精心关怀，是志愿团队的逐渐强大，是守望工具的智能升级，是更多社区的抱团发联动，',
+      '二十多年里，"邻里守望"是邻里之间你帮我、我帮你，是党建引领下一老一小的精心关怀，是志愿团队的逐渐强大，是守望工具的智能升级，是更多社区的抱团发展，',
       '广场社区的义警可以跨区巡逻，翠华社区的维修师傅能到白云社区上门服务，志愿积分还能跨社区"通存通兑"，',
       '它让"远亲不如近邻"这句老话，在白云街道变成了真真切切的生活日常，一种文化能成为品牌，不是因为它喊得响，而是因为它走得远、扎得深、暖得到人心。'
     ],
@@ -406,7 +405,8 @@ const KNOWLEDGE_BASE = [
       ['祖孙', '互动', '相册'], ['朝夕相伴', '设备']
     ],
     answer: [
-      '我想想，嗯，我想设计一款"祖孙互动相册"——用AI识别祖孙共同参加活动的照片，自动生成成长故事视频；',
+      '我想想，嗯。',
+      '我想设计一款"祖孙互动相册"——用AI识别祖孙共同参加活动的照片，自动生成成长故事视频；',
       '配上语音留言功能，让孩子和爷爷奶奶随时"隔空对话"，让"小手牵大手"更有温度！'
     ],
     charId: 'xiaozhi'

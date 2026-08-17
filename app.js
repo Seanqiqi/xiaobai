@@ -319,8 +319,8 @@ const App = {
         // 只说了"你好"，提示用户提问
         // 设置标记：回复结束后直接进入LISTENING（不进入STANDBY）
         this._wakeWordResponse = true;
-        this._showSubtitle('嗯，我在~');
-        VoiceManager.speak('嗯，我在~', this.currentChar.voice);
+        this._showSubtitle('我在');
+        VoiceManager.speak('我在', this.currentChar.voice);
         return;
       }
     }
@@ -506,10 +506,10 @@ const App = {
     } else {
       // 只说了唤醒词，切换到监听状态并回复
       this._setState('LISTENING');
-      this._showSubtitle('嗯，我在~');
+      this._showSubtitle('我在');
       // 设置标记：唤醒回复结束后直接进入LISTENING（不进入STANDBY）
       this._wakeWordResponse = true;
-      VoiceManager.speak('嗯，我在~', this.currentChar.voice);
+      VoiceManager.speak('我在', this.currentChar.voice);
     }
   },
 
@@ -541,20 +541,39 @@ const App = {
     this._updateCharSelector();
     this.el.charArea.classList.add('switching');
 
-    // 触发背景擦除切换
+    // 触发背景擦除切换（与角色淡出并行）
     this._switchBackground(char.bg);
 
-    setTimeout(() => {
+    // ===== 优化：预加载新角色图片，加载完成后立即切换显示，避免白屏闪烁 =====
+    const preloadAndSwitch = () => {
       this._updateDisplay(char);
 
       // 播放入场动画，结束后显示角色并回答问题
       this._playEntranceVideo(char, () => {
         this.el.charArea.classList.remove('switching');
-        setTimeout(() => {
-          VoiceManager.speak(answer, char.voice);
-        }, 400);
+        VoiceManager.speak(answer, char.voice);
       });
-    }, 400);
+    };
+
+    // 预加载新角色的待机图和张嘴图
+    const img1 = new Image();
+    const img2 = new Image();
+    img1.src = char.image;
+    img2.src = char.imageSpeak || char.image;
+
+    let switched = false;
+    const doSwitch = () => {
+      if (switched) return;
+      switched = true;
+      preloadAndSwitch();
+    };
+
+    img1.onload = doSwitch;
+    img2.onload = doSwitch;
+    img1.onerror = doSwitch;
+
+    // 兜底超时
+    setTimeout(doSwitch, 400);
   },
 
   /**
@@ -636,11 +655,11 @@ const App = {
     // 淡出当前角色
     this.el.charArea.classList.add('switching');
 
-    // 触发背景擦除切换
+    // 触发背景擦除切换（与角色淡出并行，节省时间）
     this._switchBackground(char.bg);
 
-    // 在擦除动画进行到一半时切换角色图片，然后播放入场动画
-    setTimeout(() => {
+    // ===== 优化：预加载新角色图片，加载完成后立即切换显示，避免白屏闪烁 =====
+    const preloadAndSwitch = () => {
       this._updateDisplay(char);
 
       // 播放入场动画，结束后显示角色并播放讲解
@@ -648,11 +667,31 @@ const App = {
         this.el.charArea.classList.remove('switching');
         // 播放讲解：默认说greeting+sections+prompt(切换角色时触发开场白)；
         // skipGreeting=true 时只说 sections（仅用于"重复讲解"等不需要开场的场景）
-        setTimeout(() => {
-          this._narrate(char, skipGreeting ? 'sections' : 'all');
-        }, 500);
+        this._narrate(char, skipGreeting ? 'sections' : 'all');
       });
-    }, 400);
+    };
+
+    // 预加载新角色的待机图和张嘴图
+    const img1 = new Image();
+    const img2 = new Image();
+    img1.src = char.image;
+    img2.src = char.imageSpeak || char.image;
+
+    // 等待图片加载完成或最多 400ms（取先到者），避免图片未加载完就切换导致白屏
+    let switched = false;
+    const doSwitch = () => {
+      if (switched) return;
+      switched = true;
+      preloadAndSwitch();
+    };
+
+    // 任一张图片加载完即尝试切换（另一张后台继续加载）
+    img1.onload = doSwitch;
+    img2.onload = doSwitch;
+    img1.onerror = doSwitch; // 加载失败也继续，避免卡死
+
+    // 兜底超时：最长等 400ms（与原串行延时一致），避免图片加载过慢
+    setTimeout(doSwitch, 400);
   },
 
   // ==================== 讲解流程 ====================
@@ -787,6 +826,7 @@ const App = {
         this.el.statusIcon.className = '';
         this.el.statusText.textContent = '聆听中';
         this.el.subtitleBar.classList.remove('active');
+        this.el.subtitleText.textContent = '';   // 清空字幕，避免上一句残留
         this.el.interimText.textContent = '';
         VoiceManager.startListening();
         this._startIdleTimer(); // 进入监听状态，启动空闲计时
@@ -795,6 +835,7 @@ const App = {
         this.el.statusIcon.className = 'standby';
         this.el.statusText.textContent = '待机中';
         this.el.subtitleBar.classList.remove('active');
+        this.el.subtitleText.textContent = '';   // 清空字幕，避免上一句残留
         this.el.interimText.textContent = '';
         // 待机状态下保持STT运行，用于检测唤醒词
         VoiceManager.startListening();

@@ -381,31 +381,14 @@ const VoiceManager = {
       pitch = Math.min(pitch, 1.3); // 童声语音本身已童趣，音调封顶1.3
     }
 
-    let index = 0;
+    // ===== 优化：一次性把所有句子加入 TTS 队列 =====
+    // 利用浏览器 SpeechSynthesis 的内部排队机制，上一句结束立刻衔接下一句，
+    // 完全避免 setTimeout 句间延时；同时 onstart/onend 仍逐句触发用于嘴型和字幕。
+    let pendingOnEnd = null;
 
-    const speakNext = () => {
-      // 如果已被 stopSpeaking 中止，不再继续
-      if (!this._speaking) return;
-
-      if (index >= lines.length) {
-        this._speaking = false;
-        if (this.onSpeakEnd) this.onSpeakEnd();
-        return;
-      }
-
-      const text = lines[index].trim();
-      if (!text) {
-        index++;
-        speakNext();
-        return;
-      }
-
-      // 更新字幕
-      if (this.onSubtitle) this.onSubtitle(text);
-
-      // 记录当前播放文本（用于回声过滤）
-      this._lastSpokenText = text;
-      this._lastSpokenTime = Date.now();
+    for (let i = 0; i < lines.length; i++) {
+      const text = lines[i].trim();
+      if (!text) continue;
 
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'zh-CN';
@@ -414,28 +397,36 @@ const VoiceManager = {
       utterance.volume = 1;
       if (this.chineseVoice) utterance.voice = this.chineseVoice;
 
-      // 声音实际开始播放时才触发嘴部动画
-      utterance.onstart = () => {
-        if (this.onUtteranceStart) this.onUtteranceStart();
-      };
+      // 记录当前播放文本（用于回声过滤）—— 使用 IIFE 捕获本句的值
+      (function (sentence, isLast) {
+        // 每句开始：更新字幕 + 嘴型动画
+        utterance.onstart = () => {
+          if (!this._speaking) return;
+          if (this.onSubtitle) this.onSubtitle(sentence);
+          this._lastSpokenText = sentence;
+          this._lastSpokenTime = Date.now();
+          if (this.onUtteranceStart) this.onUtteranceStart();
+        };
 
-      utterance.onend = () => {
-        index++;
-        // 短暂停顿后继续下一句，让字幕有展示时间
-        setTimeout(speakNext, 400);
-      };
+        utterance.onend = () => {
+          if (isLast) {
+            // 最后一句才触发 onSpeakEnd；cancel 时这里的 isLast 判断能防止误回调
+            if (this._speaking) {
+              this._speaking = false;
+              if (this.onSpeakEnd) this.onSpeakEnd();
+            }
+          }
+        };
 
-      utterance.onerror = (e) => {
-        console.warn('[Voice] TTS 错误:', e.error);
-        index++;
-        setTimeout(speakNext, 200);
-      };
+        utterance.onerror = (e) => {
+          // 中断/取消错误：由 cancel 侧统一处理，不单独推进
+          if (e.error === 'canceled' || e.error === 'interrupted') return;
+          console.warn('[Voice] TTS 错误:', e.error);
+        };
+      }.call(this, text, i === lines.length - 1));
 
       this.synthesis.speak(utterance);
-    };
-
-    // 小延迟确保 cancel 完成
-    setTimeout(speakNext, 100);
+    }
   },
 
   stopSpeaking() {
