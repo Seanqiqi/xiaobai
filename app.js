@@ -223,6 +223,11 @@ const App = {
       this._speakStartTime = Date.now(); // 更新冷却时间戳
     };
 
+    // 单句语音结束时停止嘴部动画（闭嘴等待下一句，避免无声音时嘴还在动）
+    VoiceManager.onUtteranceEnd = () => {
+      this._stopMouthAnimation();
+    };
+
     // 说话结束
     VoiceManager.onSpeakEnd = () => {
       this._onSpeakEnd();

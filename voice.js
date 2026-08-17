@@ -40,6 +40,8 @@ const VoiceManager = {
   _lastSpokenTime: 0,     // 最近播放时间戳
   _voicePollTimer: null,  // 语音轮询定时器（等待Edge在线Neural语音加载）
   _voiceLoadCount: 0,     // 语音加载次数计数
+  _keepAliveTimer: null,  // TTS 队列保活定时器（防止 Chrome 15 秒自动暂停 bug）
+  _boundaryTimer: null,   // 字幕边界回退定时器（onboundary 不生效时兜底）
 
   // ---- 回调 ----
   onRecognize: null,
@@ -47,7 +49,8 @@ const VoiceManager = {
   onSubtitle: null,
   onSpeakStart: null,
   onSpeakEnd: null,
-  onUtteranceStart: null, // 单句语音实际开始播放时触发（用于嘴部动画同步）
+  onUtteranceStart: null, // 单句语音实际开始播放时触发（用于启动嘴部动画）
+  onUtteranceEnd: null,   // 单句语音结束时触发（用于停止嘴部动画，闭嘴等待下一句）
   onListenStart: null,
   onListenEnd: null,
   onVoiceReady: null,     // 语音加载完成时触发（voice, isChild, isOnline）
@@ -366,14 +369,33 @@ const VoiceManager = {
       return;
     }
 
+    // 清理上一次可能残留的定时器
+    if (this._keepAliveTimer) {
+      clearInterval(this._keepAliveTimer);
+      this._keepAliveTimer = null;
+    }
+    if (this._boundaryTimer) {
+      clearTimeout(this._boundaryTimer);
+      this._boundaryTimer = null;
+    }
+
     // 停止当前朗读（但保持监听，用于唤醒词检测）
     this.synthesis.cancel();
 
     this._speaking = true;
     if (this.onSpeakStart) this.onSpeakStart();
 
-    // 确保是数组
-    const lines = Array.isArray(sentences) ? sentences : [sentences];
+    // 确保是数组，并过滤空串
+    const rawLines = (Array.isArray(sentences) ? sentences : [sentences])
+      .map(s => (s || '').trim())
+      .filter(Boolean);
+
+    if (rawLines.length === 0) {
+      this._speaking = false;
+      if (this.onSpeakEnd) this.onSpeakEnd();
+      return;
+    }
+
     // 童趣音调：默认提高音调模拟童声；若已选中童声语音则适当降低，避免过度尖锐
     let pitch = voiceConfig.pitch ?? 1.6;
     const rate = voiceConfig.rate ?? 1.0;
@@ -381,52 +403,156 @@ const VoiceManager = {
       pitch = Math.min(pitch, 1.3); // 童声语音本身已童趣，音调封顶1.3
     }
 
-    // ===== 优化：一次性把所有句子加入 TTS 队列 =====
-    // 利用浏览器 SpeechSynthesis 的内部排队机制，上一句结束立刻衔接下一句，
-    // 完全避免 setTimeout 句间延时；同时 onstart/onend 仍逐句触发用于嘴型和字幕。
-    let pendingOnEnd = null;
+    // ===== 核心优化：所有句子合并成一个 utterance，消除句间 TTS 初始化/标点停顿 =====
+    // 之前每句独立 utterance 导致 Chrome 在句末句号后会"自然停顿"300~800ms，
+    // 合并成一条 utterance 后 TTS 一次性合成，句子之间几乎零延迟衔接。
+    // 同时用 onboundary 事件 + 字符位置记录，保证字幕仍然逐句切换。
 
-    for (let i = 0; i < lines.length; i++) {
-      const text = lines[i].trim();
-      if (!text) continue;
+    // 1. 计算每个子句在合并文本中的起始字符位置（用于字幕切换锚点）
+    const lineMarks = [];   // [{ start, end, text, index }]
+    let cursor = 0;
+    const mergedText = rawLines.map((line, idx) => {
+      // 句子之间用中文逗号"，"连接，TTS 只会做一个极短停顿（约 80ms），
+      // 而不会像句号那样停 300~800ms，同时保证语义仍然连贯。
+      const sep = idx > 0 ? '，' : '';
+      const seg = sep + line;
+      const segStart = cursor;
+      cursor += seg.length;
+      lineMarks.push({
+        start: segStart,
+        end: cursor,
+        text: line,
+        index: idx,
+        shown: false,
+      });
+      return seg;
+    }).join('');
 
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'zh-CN';
-      utterance.pitch = pitch;
-      utterance.rate = rate;
-      utterance.volume = 1;
-      if (this.chineseVoice) utterance.voice = this.chineseVoice;
+    const utterance = new SpeechSynthesisUtterance(mergedText);
+    utterance.lang = 'zh-CN';
+    utterance.pitch = pitch;
+    utterance.rate = rate;
+    utterance.volume = 1;
+    if (this.chineseVoice) utterance.voice = this.chineseVoice;
 
-      // 记录当前播放文本（用于回声过滤）—— 使用 IIFE 捕获本句的值
-      (function (sentence, isLast) {
-        // 每句开始：更新字幕 + 嘴型动画
-        utterance.onstart = () => {
-          if (!this._speaking) return;
-          if (this.onSubtitle) this.onSubtitle(sentence);
-          this._lastSpokenText = sentence;
+    let currentLineIdx = -1;   // 当前正在显示的字幕句索引
+    let utteranceEnded = false;
+    let boundaryFired = false; // 是否至少触发过一次 onboundary（用于检测兜底是否需要启动）
+
+    // ===== 字幕切换函数：根据 charIndex 找到所在句子，切换到对应字幕 =====
+    const switchSubtitleByIndex = (charIndex) => {
+      // 找到第一个 end > charIndex 的句子
+      for (let i = 0; i < lineMarks.length; i++) {
+        if (charIndex >= lineMarks[i].start && charIndex < lineMarks[i].end) {
+          if (i !== currentLineIdx && !lineMarks[i].shown) {
+            lineMarks[i].shown = true;
+            currentLineIdx = i;
+            const sentence = lineMarks[i].text;
+            // 切换字幕 + 嘴部动画
+            if (this.onSubtitle) this.onSubtitle(sentence);
+            this._lastSpokenText = sentence;
+            this._lastSpokenTime = Date.now();
+            if (this.onUtteranceStart) this.onUtteranceStart();
+            // 推进下一句的兜底定时器
+            scheduleFallbackTimer();
+          }
+          return;
+        }
+      }
+      // 最后一句结束后 charIndex 会 = mergedText.length，
+      // 此时显示最后一句字幕（防止最后一句因 boundary 没触发而不显示）
+      if (charIndex >= mergedText.length && currentLineIdx < lineMarks.length - 1) {
+        const last = lineMarks[lineMarks.length - 1];
+        if (!last.shown) {
+          last.shown = true;
+          currentLineIdx = lineMarks.length - 1;
+          if (this.onSubtitle) this.onSubtitle(last.text);
+          this._lastSpokenText = last.text;
           this._lastSpokenTime = Date.now();
           if (this.onUtteranceStart) this.onUtteranceStart();
-        };
+        }
+      }
+    };
 
-        utterance.onend = () => {
-          if (isLast) {
-            // 最后一句才触发 onSpeakEnd；cancel 时这里的 isLast 判断能防止误回调
-            if (this._speaking) {
-              this._speaking = false;
-              if (this.onSpeakEnd) this.onSpeakEnd();
-            }
-          }
-        };
+    // ===== 兜底推进：onboundary 不支持/不精确时，按字数估算每句时长逐句推进字幕 =====
+    // 中文 TTS 语速约 3.5~5 字/秒（rate=1.0 时），这里取 4.2 字/秒，并结合 rate 调整。
+    const ESTIMATED_CHARS_PER_SEC = 4.2;
+    const estCharPerSec = ESTIMATED_CHARS_PER_SEC * rate;
+    // 预计算每句的预计时长（毫秒）
+    lineMarks.forEach(m => {
+      const charCount = m.text.length;
+      // 单句预估时长：(字符数 / 每秒字符数) * 1000ms，再打 9 折让字幕略提前
+      m.estimatedMs = Math.max(600, (charCount / estCharPerSec) * 1000 * 0.9);
+    });
 
-        utterance.onerror = (e) => {
-          // 中断/取消错误：由 cancel 侧统一处理，不单独推进
-          if (e.error === 'canceled' || e.error === 'interrupted') return;
-          console.warn('[Voice] TTS 错误:', e.error);
-        };
-      }.call(this, text, i === lines.length - 1));
+    const scheduleFallbackTimer = () => {
+      // 清理上一个兜底计时
+      if (this._boundaryTimer) {
+        clearTimeout(this._boundaryTimer);
+        this._boundaryTimer = null;
+      }
+      const nextIdx = currentLineIdx + 1;
+      if (nextIdx >= lineMarks.length) return; // 已是最后一句，不再兜底
+      const curMark = lineMarks[currentLineIdx >= 0 ? currentLineIdx : 0];
+      // 等到当前句预估结束时，检查 boundary 是否推进了下一句；如果没有，强制推进
+      this._boundaryTimer = setTimeout(() => {
+        if (utteranceEnded || !this._speaking) return;
+        if (currentLineIdx < nextIdx && !lineMarks[nextIdx].shown) {
+          // boundary 没及时推进，兜底强制切换
+          switchSubtitleByIndex(lineMarks[nextIdx].start);
+        } else {
+          // boundary 已正常推进，继续给下一句挂兜底
+          scheduleFallbackTimer();
+        }
+      }, curMark.estimatedMs);
+    };
 
-      this.synthesis.speak(utterance);
-    }
+    // ===== Chrome SpeechSynthesis 保活（合并后仍然需要，因为单句超 15 秒仍可能暂停） =====
+    this._keepAliveTimer = setInterval(() => {
+      if (this._speaking && this.synthesis.speaking && !utteranceEnded) {
+        this.synthesis.resume();
+      }
+    }, 2500);
+
+    // 第一句：onstart 立即显示（不要等第一个 boundary）
+    utterance.onstart = () => {
+      if (!this._speaking) return;
+      switchSubtitleByIndex(0);
+    };
+
+    // ===== onboundary 事件：每次字符边界触发时，根据 charIndex 切换字幕 =====
+    utterance.onboundary = (ev) => {
+      if (!this._speaking) return;
+      boundaryFired = true;
+      // ev.charIndex 在中文语音下是字符级（Chrome/Edge 在线 Neural 语音支持最佳）
+      switchSubtitleByIndex(ev.charIndex ?? 0);
+    };
+
+    utterance.onend = () => {
+      utteranceEnded = true;
+      // 嘴部动画停止（闭嘴）
+      if (this.onUtteranceEnd) this.onUtteranceEnd();
+      // 清理保活定时器
+      if (this._keepAliveTimer) {
+        clearInterval(this._keepAliveTimer);
+        this._keepAliveTimer = null;
+      }
+      if (this._boundaryTimer) {
+        clearTimeout(this._boundaryTimer);
+        this._boundaryTimer = null;
+      }
+      if (this._speaking) {
+        this._speaking = false;
+        if (this.onSpeakEnd) this.onSpeakEnd();
+      }
+    };
+
+    utterance.onerror = (e) => {
+      if (e.error === 'canceled' || e.error === 'interrupted') return;
+      console.warn('[Voice] TTS 错误:', e.error);
+    };
+
+    this.synthesis.speak(utterance);
   },
 
   stopSpeaking() {
@@ -434,6 +560,15 @@ const VoiceManager = {
       this.synthesis.cancel();
     }
     this._speaking = false;
+    // 清理所有定时器
+    if (this._keepAliveTimer) {
+      clearInterval(this._keepAliveTimer);
+      this._keepAliveTimer = null;
+    }
+    if (this._boundaryTimer) {
+      clearTimeout(this._boundaryTimer);
+      this._boundaryTimer = null;
+    }
     // 清除回声过滤文本（保留5秒后清除，由调用方控制）
     this._lastSpokenText = '';
   },
